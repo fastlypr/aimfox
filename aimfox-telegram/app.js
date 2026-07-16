@@ -61,6 +61,31 @@ async function sendTelegram(text) {
   if (!res.ok) throw new Error(`Telegram ${res.status}: ${(await res.text()).slice(0, 300)}`);
 }
 
+async function sendTelegramPhoto(photo, caption) {
+  const res = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ chat_id: CHAT_ID, photo, caption, parse_mode: "HTML" }),
+  });
+  if (!res.ok) throw new Error(`Telegram sendPhoto ${res.status}: ${(await res.text()).slice(0, 300)}`);
+}
+
+// Send the alert with the lead's profile photo, falling back to plain text if the
+// photo URL can't be fetched by Telegram (some LinkedIn image links expire).
+async function deliver(c) {
+  const text = formatAlert(c);
+  const pic = ((c.participants && c.participants[0]) || {}).picture_url;
+  if (!pic) return sendTelegram(text);
+  try {
+    if (text.length <= 1024) return await sendTelegramPhoto(pic, text);
+    await sendTelegramPhoto(pic, "🔔 New LinkedIn reply");   // caption limit is 1024
+    return await sendTelegram(text);
+  } catch (e) {
+    console.error("photo send failed, sending text:", e.message);
+    return sendTelegram(text);
+  }
+}
+
 let accountNames = {};
 async function loadAccounts() {
   try {
@@ -112,7 +137,7 @@ async function checkNow(trigger) {
       const fromLead = !m.sender || String(m.sender.id) !== String(c.owner);
       if (ts <= state.cursor || state.alerted.includes(m.urn) || !fromLead) continue;
       try {
-        await sendTelegram(formatAlert(c));
+        await deliver(c);
         fs.appendFile(LOG_FILE, JSON.stringify({ received_at: new Date().toISOString(), trigger, convo: c }) + "\n", () => {});
         state.alerted.push(m.urn);
         state.cursor = Math.max(state.cursor, ts);
