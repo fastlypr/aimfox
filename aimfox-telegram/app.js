@@ -140,11 +140,17 @@ const server = http.createServer((req, res) => {
   if (SECRET && req.headers["x-webhook-secret"] !== SECRET) {
     res.writeHead(401); res.end("Unauthorized"); return;
   }
-  // Drain body, answer immediately, then check.
-  req.on("data", () => {});
+  // Buffer body, answer immediately, log the raw Aimfox payload, then check.
+  let body = "";
+  req.on("data", (c) => { body += c; if (body.length > 1_000_000) req.destroy(); });
   req.on("end", () => {
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end('{"status":"ok"}');
+    let parsed;
+    try { parsed = body ? JSON.parse(body) : {}; } catch { parsed = { _unparsed: body }; }
+    fs.appendFile(path.join(DATA_DIR, "webhook-raw.jsonl"),
+      JSON.stringify({ received_at: new Date().toISOString(), payload: parsed }) + "\n", () => {});
+    console.log(`📩 webhook payload: ${JSON.stringify(parsed).slice(0, 1000)}`);
     checkNow("webhook");
   });
 });
