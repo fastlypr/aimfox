@@ -1,0 +1,7 @@
+# Caddy gives you automatic HTTPS (free Let's Encrypt cert, auto-renewed).
+# Replace the domain with a subdomain you point at this server's IP,
+# e.g. aimfox.fastlypr.com  (create a DNS A record → your server's public IP).
+
+aimfox.example.com {
+    reverse_proxy localhost:3000
+}

@@ -1,0 +1,8 @@
+# Automatic HTTPS via sslip.io (no DNS setup needed).
+# Replace with YOUR server's public IP, dashes instead of dots, + .sslip.io
+# e.g. if IP is 203.0.113.5  ->  203-0-113-5.sslip.io
+# Caddy fetches + auto-renews a free Let's Encrypt cert for it.
+
+YOUR-IP-WITH-DASHES.sslip.io {
+    reverse_proxy localhost:3000
+}

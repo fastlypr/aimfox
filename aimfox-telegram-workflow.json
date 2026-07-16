@@ -1,0 +1,61 @@
+{
+  "name": "Aimfox → Telegram Reply Alerts",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "aimfox-reply",
+        "responseMode": "onReceived",
+        "responseCode": 200,
+        "options": {}
+      },
+      "id": "d1a2b3c4-0001-0001-0001-000000000001",
+      "name": "Aimfox Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [400, 300],
+      "webhookId": "aimfox-reply"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Aimfox sends the event payload as the POST body.\n// n8n wraps it under `.body`; fall back to the root just in case.\nconst raw = $input.first().json;\nconst p = raw.body || raw;\n\nconst event = p.event || p.type || p.event_type || 'reply';\n\n// Sender / lead name (Aimfox field names can vary by event, so we probe several)\nconst lead = p.lead || p.target || p.contact || p.from || {};\nconst name =\n  lead.full_name ||\n  [lead.first_name, lead.last_name].filter(Boolean).join(' ') ||\n  p.full_name ||\n  p.name ||\n  'Unknown lead';\n\n// Reply text\nconst message =\n  (p.message && (p.message.text || p.message.body)) ||\n  p.text ||\n  p.body ||\n  p.reply ||\n  '';\n\nconst account = p.account_name || (p.account && p.account.full_name) || p.account_id || '';\nconst campaign = (p.campaign && p.campaign.name) || p.campaign_name || p.campaign_id || '';\n\nconst esc = (s) =>\n  String(s ?? '')\n    .replace(/&/g, '&amp;')\n    .replace(/</g, '&lt;')\n    .replace(/>/g, '&gt;');\n\nlet out = `🔔 <b>New LinkedIn reply</b>\\n`;\nout += `👤 <b>${esc(name)}</b>\\n`;\nif (campaign) out += `📣 ${esc(campaign)}\\n`;\nif (account) out += `🔗 via ${esc(account)}\\n`;\nif (message) out += `\\n💬 ${esc(message)}\\n`;\nout += `\\n<code>event: ${esc(event)}</code>`;\n\n// If we couldn't locate the message text, attach the raw payload so nothing is lost.\n// (First real reply lets us see the exact field names and make this pretty.)\nif (!message) {\n  out += `\\n\\n<b>Raw payload:</b>\\n<pre>${esc(JSON.stringify(p).slice(0, 1500))}</pre>`;\n}\n\nreturn [{ json: { message: out, raw: p } }];"
+      },
+      "id": "d1a2b3c4-0002-0002-0002-000000000002",
+      "name": "Format Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [640, 300]
+    },
+    {
+      "parameters": {
+        "chatId": "REPLACE_WITH_YOUR_CHAT_ID",
+        "text": "={{ $json.message }}",
+        "additionalFields": {
+          "parse_mode": "HTML",
+          "appendAttribution": false
+        }
+      },
+      "id": "d1a2b3c4-0003-0003-0003-000000000003",
+      "name": "Send Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [880, 300],
+      "credentials": {
+        "telegramApi": {
+          "id": "REPLACE_WITH_TELEGRAM_CREDENTIAL",
+          "name": "Aimfox Bot"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Aimfox Webhook": {
+      "main": [[{ "node": "Format Message", "type": "main", "index": 0 }]]
+    },
+    "Format Message": {
+      "main": [[{ "node": "Send Telegram", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "active": false
+}

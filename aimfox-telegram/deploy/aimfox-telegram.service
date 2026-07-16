@@ -1,0 +1,16 @@
+[Unit]
+Description=Aimfox to Telegram (webhook + backup poll)
+After=network.target
+
+[Service]
+Type=simple
+User=aimfox
+WorkingDirectory=/opt/aimfox-telegram
+# Confirm node path with `which node` (NodeSource installs put it at /usr/bin/node)
+ExecStart=/usr/bin/node --env-file=/opt/aimfox-telegram/.env /opt/aimfox-telegram/app.js
+Restart=always
+RestartSec=5
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target

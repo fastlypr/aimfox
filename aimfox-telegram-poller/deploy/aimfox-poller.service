@@ -1,0 +1,16 @@
+[Unit]
+Description=Aimfox to Telegram reply poller
+After=network.target
+
+[Service]
+Type=simple
+User=aimfox
+WorkingDirectory=/opt/aimfox-telegram-poller
+# Confirm node path with `which node` (NodeSource installs put it at /usr/bin/node)
+ExecStart=/usr/bin/node --env-file=/opt/aimfox-telegram-poller/.env /opt/aimfox-telegram-poller/poller.js
+Restart=always
+RestartSec=5
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target
