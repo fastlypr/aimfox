@@ -95,6 +95,22 @@ async function loadAccounts() {
   } catch (e) { console.error("⚠️  Could not load account names:", e.message); }
 }
 
+// Accurate campaign attribution: /analytics/recent-leads returns each recent event
+// (incl. replies) with its exact campaign_name, keyed by the lead's urn. Refreshed
+// on every check so a just-arrived reply is already in it.
+let campaignByUrn = new Map();
+async function loadRecentCampaigns() {
+  try {
+    const data = await aimfox("/analytics/recent-leads");
+    const map = new Map();
+    for (const l of data.leads || []) {
+      // list is newest-first; keep the newest campaign per lead
+      if (l.target_urn && l.campaign_name && !map.has(l.target_urn)) map.set(l.target_urn, l.campaign_name);
+    }
+    campaignByUrn = map;
+  } catch (e) { console.error("⚠️  Could not load recent-leads campaigns:", e.message); }
+}
+
 // Trim a noisy LinkedIn headline down to just the role (before the first | or ( ).
 function cleanRole(occ) {
   if (!occ) return "";
@@ -120,6 +136,7 @@ function formatAlert(c) {
   out += fieldRow("Role", role);
   out += fieldRow("From", loc);
   out += fieldRow("Account", via);
+  out += fieldRow("Campaign", campaignByUrn.get(lead.urn) || "");
   out += fieldRow("Tags", tags);
 
   if (m.body) out += `\n<blockquote>${esc(m.body)}</blockquote>\n`;
@@ -147,6 +164,7 @@ async function checkNow(trigger) {
       return;
     }
 
+    await loadRecentCampaigns();   // refresh campaign names before building alerts
     const sorted = [...convos].sort((a, b) => (a.last_activity_at || 0) - (b.last_activity_at || 0));
     for (const c of sorted) {
       const m = c.last_message;
@@ -209,5 +227,5 @@ async function main() {
   setInterval(() => checkNow("backup-poll"), BACKUP_POLL);
 }
 
-export { checkNow, formatAlert, loadAccounts, state };
+export { checkNow, formatAlert, loadAccounts, loadRecentCampaigns, state };
 if (import.meta.url === `file://${process.argv[1]}`) main();
