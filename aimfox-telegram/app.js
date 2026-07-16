@@ -95,17 +95,35 @@ async function loadAccounts() {
   } catch (e) { console.error("⚠️  Could not load account names:", e.message); }
 }
 
+// Trim a noisy LinkedIn headline down to just the role (before the first | or ( ).
+function cleanRole(occ) {
+  if (!occ) return "";
+  let r = String(occ).split(/[|(]/)[0].replace(/\s+/g, " ").trim();
+  if (r.length > 60) r = r.slice(0, 60).replace(/\s+\S*$/, "") + "…";
+  return r;
+}
+
 function formatAlert(c) {
   const m = c.last_message || {};
   const lead = (c.participants && c.participants[0]) || {};
   const name = lead.full_name || (m.sender && m.sender.full_name) || "Unknown lead";
   const via = accountNames[String(c.owner)] || `account ${c.owner}`;
   const handle = lead.public_identifier ? `https://www.linkedin.com/in/${lead.public_identifier}` : null;
-  const occ = lead.occupation ? String(lead.occupation).split("|")[0].trim() : "";
-  let out = `🔔 <b>New LinkedIn reply</b>\n👤 <b>${esc(name)}</b>\n`;
-  if (occ) out += `<i>${esc(occ)}</i>\n`;
-  out += `🔗 via ${esc(via)}\n`;
-  if (m.body) out += `\n💬 ${esc(m.body)}\n`;
+  const role = cleanRole(lead.occupation);
+  const loc = lead.location && lead.location.name ? lead.location.name : "";
+
+  const tags = (lead.labels || []).map((l) => l.name).filter(Boolean).join(", ");
+  const fieldRow = (label, value) => (value ? `<b>${label}</b>  ${esc(value)}\n` : "");
+
+  let out = `🔔 <b>New LinkedIn reply</b>\n\n`;
+  out += `<b>${esc(name)}</b>\n\n`;
+  out += fieldRow("Role", role);
+  out += fieldRow("From", loc);
+  out += fieldRow("Account", via);
+  out += fieldRow("Tags", tags);
+
+  if (m.body) out += `\n<blockquote>${esc(m.body)}</blockquote>\n`;
+
   if (handle) out += `\n<a href="${esc(handle)}">Open LinkedIn profile</a>`;
   return out;
 }
